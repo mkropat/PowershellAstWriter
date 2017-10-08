@@ -24,24 +24,19 @@ namespace PowershellAstWriter
 
         private string TranslateStatement(StatementAst statement)
         {
-            var type = statement.GetType();
-            if (type == typeof(PipelineAst))
+            switch (statement)
             {
-                var pipe = (PipelineAst)statement;
-                return string.Join(" | ", pipe.PipelineElements.Select(TranslateCommand));
-            }
-            else if (type == typeof(AssignmentStatementAst))
-            {
-                var assignment = (AssignmentStatementAst)statement;
-                return $"{TranslateExpression(assignment.Left)} {TranslateToken(assignment.Operator)} {TranslateStatement(assignment.Right)}";
-            }
-            else if (statement is CommandBaseAst)
-            {
-                return TranslateCommand((CommandBaseAst)statement);
-            }
-            else
-            {
-                throw new Exception("unhandled");
+                case AssignmentStatementAst s:
+                    return $"{TranslateExpression(s.Left)} {TranslateToken(s.Operator)} {TranslateStatement(s.Right)}";
+
+                case CommandBaseAst s:
+                    return TranslateCommand(s);
+
+                case PipelineAst s:
+                    return string.Join(" | ", s.PipelineElements.Select(TranslateCommand));
+
+                default:
+                    throw new Exception("unhandled");
             }
         }
 
@@ -87,69 +82,49 @@ namespace PowershellAstWriter
 
         private string TranslateExpression(object expression)
         {
-            var type = expression.GetType();
-            if (type == typeof(StringConstantExpressionAst))
+            switch (expression)
             {
-                var constant = (StringConstantExpressionAst)expression;
-                return TranslateString(constant.Value, constant.StringConstantType);
-            }
-            else if (type == typeof (BinaryExpressionAst))
-            {
-                var binary = (BinaryExpressionAst)expression;
-                return TranslateExpression(binary.Left) + " " + TranslateToken(binary.Operator) + " " + TranslateExpression(binary.Right);
-            }
-            else if (type == typeof(ConstantExpressionAst))
-            {
-                var constant = (ConstantExpressionAst)expression;
-                return constant.Value.ToString();
-            }
-            else if (type == typeof (CommandParameterAst))
-            {
-                var parameter = (CommandParameterAst)expression;
-                var option = "-" + parameter.ParameterName;
-                return parameter.Argument == null ? option : $"{option}:{TranslateExpression(parameter.Argument)}";
-            }
-            else if (type == typeof (ExpandableStringExpressionAst))
-            {
-                var str = (ExpandableStringExpressionAst)expression;
-                return TranslateString(str.Value, str.StringConstantType);
-            }
-            else if (type == typeof (InvokeMemberExpressionAst))
-            {
-                var invokeExpression = (InvokeMemberExpressionAst)expression;
-                var argumentList = invokeExpression.Arguments == null
-                    ? string.Empty
-                    : string.Join(", ", invokeExpression.Arguments.Select(TranslateExpression));
-                var separator = invokeExpression.Static ? "::" : ".";
-                return TranslateExpression(invokeExpression.Expression) +
-                    separator +
-                    TranslateExpression(invokeExpression.Member) +
-                    $"({argumentList})";
-            }
-            else if (type == typeof (MemberExpressionAst))
-            {
-                var member = (MemberExpressionAst)expression;
-                var separator = member.Static ? "::" : ".";
-                return TranslateExpression(member.Expression) + separator + TranslateExpression(member.Member);
-            }
-            else if (type == typeof (ScriptBlockExpressionAst))
-            {
-                var script = (ScriptBlockExpressionAst)expression;
-                return $"{{ {TranslateScript(script.ScriptBlock)} }}";
-            }
-            else if (type == typeof(UnaryExpressionAst))
-            {
-                var unary = (UnaryExpressionAst)expression;
-                return TranslateToken(unary.TokenKind) + ' ' + TranslateExpression(unary.Child);
-            }
-            else if (type == typeof(VariableExpressionAst))
-            {
-                var var = (VariableExpressionAst)expression;
-                return '$' + var.VariablePath.UserPath;
-            }
-            else
-            {
-                throw new Exception("unhandled");
+                case BinaryExpressionAst e:
+                    return TranslateExpression(e.Left) + " " + TranslateToken(e.Operator) + " " + TranslateExpression(e.Right);
+
+                case StringConstantExpressionAst e:
+                    return TranslateString(e.Value, e.StringConstantType);
+
+                case ConstantExpressionAst e:
+                    return e.Value.ToString();
+
+                case CommandParameterAst e:
+                    var option = "-" + e.ParameterName;
+                    return e.Argument == null ? option : $"{option}:{TranslateExpression(e.Argument)}";
+
+                case ExpandableStringExpressionAst e:
+                    return TranslateString(e.Value, e.StringConstantType);
+
+                case InvokeMemberExpressionAst e:
+                    var argumentList = e.Arguments == null
+                        ? string.Empty
+                        : string.Join(", ", e.Arguments.Select(TranslateExpression));
+                    var separator = e.Static ? "::" : ".";
+                    return TranslateExpression(e.Expression) +
+                        separator +
+                        TranslateExpression(e.Member) +
+                        $"({argumentList})";
+
+                case MemberExpressionAst e:
+                    separator = e.Static ? "::" : ".";
+                    return TranslateExpression(e.Expression) + separator + TranslateExpression(e.Member);
+
+                case ScriptBlockExpressionAst e:
+                    return $"{{ {TranslateScript(e.ScriptBlock)} }}";
+
+                case UnaryExpressionAst e:
+                    return TranslateToken(e.TokenKind) + ' ' + TranslateExpression(e.Child);
+
+                case VariableExpressionAst e:
+                    return '$' + e.VariablePath.UserPath;
+
+                default:
+                    throw new Exception("unhandled");
             }
         }
 
