@@ -6,14 +6,21 @@ namespace PowershellAstWriter
 {
     public class PowershellAstWriter
     {
-        public string Write(ScriptBlockAst ast) {
+        public string Write(ScriptBlockAst ast)
+        {
+            if (ast == null)
+                throw new ArgumentNullException("ast");
+
             if (!ast.EndBlock.Statements.Any())
-            {
                 return string.Empty;
-            }
+
             var pipe = ast.EndBlock.Statements.OfType<PipelineAst>().First();
 
-            var cmd = pipe.PipelineElements.First();
+            return string.Join(" | ", pipe.PipelineElements.Select(TranslateCommand));
+        }
+
+        private string TranslateCommand(CommandBaseAst cmd)
+        {
             var cmdCmd = cmd as CommandAst;
             var cmdExpression = cmd as CommandExpressionAst;
 
@@ -75,6 +82,18 @@ namespace PowershellAstWriter
                 var parameter = (CommandParameterAst)expression;
                 var option = "-" + parameter.ParameterName;
                 return parameter.Argument == null ? option : $"{option}:{TranslateExpression(parameter.Argument)}";
+            }
+            else if (type == typeof (InvokeMemberExpressionAst))
+            {
+                var invokeExpression = (InvokeMemberExpressionAst)expression;
+                var argumentList = invokeExpression.Arguments == null
+                    ? string.Empty
+                    : string.Join(", ", invokeExpression.Arguments.Select(TranslateExpression));
+                var separator = invokeExpression.Static ? "::" : ".";
+                return TranslateExpression(invokeExpression.Expression) +
+                    separator +
+                    TranslateExpression(invokeExpression.Member) +
+                    $"({argumentList})";
             }
             else if (type == typeof(VariableExpressionAst))
             {
