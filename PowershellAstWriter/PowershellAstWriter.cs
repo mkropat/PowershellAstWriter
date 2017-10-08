@@ -9,14 +9,40 @@ namespace PowershellAstWriter
         public string Write(ScriptBlockAst ast)
         {
             if (ast == null)
-                throw new ArgumentNullException("ast");
+                throw new ArgumentNullException(nameof(ast));
 
-            if (!ast.EndBlock.Statements.Any())
+            return TranslateScript(ast);
+        }
+
+        public string TranslateScript(ScriptBlockAst script)
+        {
+            if (!script.EndBlock.Statements.Any())
                 return string.Empty;
 
-            var pipe = ast.EndBlock.Statements.OfType<PipelineAst>().First();
+            return TranslateStatement(script.EndBlock.Statements.First());
+        }
 
-            return string.Join(" | ", pipe.PipelineElements.Select(TranslateCommand));
+        private string TranslateStatement(StatementAst statement)
+        {
+            var type = statement.GetType();
+            if (type == typeof(PipelineAst))
+            {
+                var pipe = (PipelineAst)statement;
+                return string.Join(" | ", pipe.PipelineElements.Select(TranslateCommand));
+            }
+            else if (type == typeof(AssignmentStatementAst))
+            {
+                var assignment = (AssignmentStatementAst)statement;
+                return $"{TranslateExpression(assignment.Left)} {TranslateToken(assignment.Operator)} {TranslateStatement(assignment.Right)}";
+            }
+            else if (statement is CommandBaseAst)
+            {
+                return TranslateCommand((CommandBaseAst)statement);
+            }
+            else
+            {
+                throw new Exception("unhandled");
+            }
         }
 
         private string TranslateCommand(CommandBaseAst cmd)
@@ -49,6 +75,10 @@ namespace PowershellAstWriter
             {
                 case TokenKind.Ampersand:
                     return "&";
+                case TokenKind.And:
+                    return "-and";
+                case TokenKind.Equals:
+                    return "=";
                 default:
                     throw new Exception("unhandled");
             }
@@ -72,6 +102,11 @@ namespace PowershellAstWriter
                         throw new Exception("unhandled");
                 }
             }
+            else if (type == typeof (BinaryExpressionAst))
+            {
+                var binary = (BinaryExpressionAst)expression;
+                return TranslateExpression(binary.Left) + " " + TranslateToken(binary.Operator) + " " + TranslateExpression(binary.Right);
+            }
             else if (type == typeof(ConstantExpressionAst))
             {
                 var constant = (ConstantExpressionAst)expression;
@@ -94,6 +129,11 @@ namespace PowershellAstWriter
                     separator +
                     TranslateExpression(invokeExpression.Member) +
                     $"({argumentList})";
+            }
+            else if (type == typeof (ScriptBlockExpressionAst))
+            {
+                var script = (ScriptBlockExpressionAst)expression;
+                return $"{{ {TranslateScript(script.ScriptBlock)} }}";
             }
             else if (type == typeof(VariableExpressionAst))
             {

@@ -39,6 +39,12 @@ namespace PowershellAstWriterTests
             RoundTrip(code, code);
         }
 
+        [TestCase("$herp -and $derp")]
+        public void ItRoundTripsCompoundExpressions(string code)
+        {
+            RoundTrip(code, code);
+        }
+
         [TestCase("$derp.Frobnicate()")]
         [TestCase("$derp.Frobnicate(123, 456, 789)")]
         [TestCase("$derp::Frobnicate(123, 456, 789)")]
@@ -50,6 +56,19 @@ namespace PowershellAstWriterTests
         [TestCase("Invoke-SomeCmdlet | Invoke-AnotherCmdlet | Invoke-AThirdCmdlet")]
         [TestCase("42 | Invoke-SomeCmdlet")]
         public void ItRoundTripsPipelines(string code)
+        {
+            RoundTrip(code, code);
+        }
+
+        [TestCase("$derp = 42")]
+        [TestCase("$derp = 42 | Invoke-SomeCmdlet")]
+        public void ItRoundTripsAssignments(string code)
+        {
+            RoundTrip(code, code);
+        }
+
+        [TestCase("{ 42 }")]
+        public void ItRoundTripsScriptBlocks(string code)
         {
             RoundTrip(code, code);
         }
