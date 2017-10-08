@@ -14,7 +14,7 @@ namespace PowershellAstWriter
             return TranslateScript(ast);
         }
 
-        public string TranslateScript(ScriptBlockAst script)
+        static string TranslateScript(ScriptBlockAst script)
         {
             if (!script.EndBlock.Statements.Any())
                 return string.Empty;
@@ -22,7 +22,7 @@ namespace PowershellAstWriter
             return TranslateStatement(script.EndBlock.Statements.First());
         }
 
-        private string TranslateStatement(StatementAst statement)
+        static string TranslateStatement(StatementAst statement)
         {
             switch (statement)
             {
@@ -40,7 +40,7 @@ namespace PowershellAstWriter
             }
         }
 
-        private string TranslateCommand(CommandBaseAst cmd)
+        static string TranslateCommand(CommandBaseAst cmd)
         {
             var cmdCmd = cmd as CommandAst;
             var cmdExpression = cmd as CommandExpressionAst;
@@ -64,7 +64,7 @@ namespace PowershellAstWriter
             }
         }
 
-        private string TranslateToken(TokenKind token)
+        static string TranslateToken(TokenKind token)
         {
             switch (token)
             {
@@ -80,7 +80,7 @@ namespace PowershellAstWriter
             }
         }
 
-        private string TranslateExpression(object expression)
+        static string TranslateExpression(object expression)
         {
             switch (expression)
             {
@@ -128,7 +128,7 @@ namespace PowershellAstWriter
             }
         }
 
-        private string TranslateString(string value, StringConstantType stringType)
+        static string TranslateString(string value, StringConstantType stringType)
         {
             switch (stringType)
             {
