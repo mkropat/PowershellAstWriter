@@ -75,12 +75,13 @@ namespace PowershellAstWriter
             {
                 case TokenKind.Ampersand:
                     return "&";
-                case TokenKind.And:
-                    return "-and";
                 case TokenKind.Equals:
                     return "=";
                 default:
-                    throw new Exception("unhandled");
+                    if (TokenKindMapping.TokenToString.ContainsKey(token))
+                        return TokenKindMapping.TokenToString[token];
+                    else
+                        throw new Exception("unhandled");
             }
         }
 
@@ -90,17 +91,7 @@ namespace PowershellAstWriter
             if (type == typeof(StringConstantExpressionAst))
             {
                 var constant = (StringConstantExpressionAst)expression;
-                switch (constant.StringConstantType)
-                {
-                    case StringConstantType.BareWord:
-                        return constant.Value;
-                    case StringConstantType.DoubleQuoted:
-                        return '"' + constant.Value + '"';
-                    case StringConstantType.SingleQuoted:
-                        return '\'' + constant.Value + '\'';
-                    default:
-                        throw new Exception("unhandled");
-                }
+                return TranslateString(constant.Value, constant.StringConstantType);
             }
             else if (type == typeof (BinaryExpressionAst))
             {
@@ -118,6 +109,11 @@ namespace PowershellAstWriter
                 var option = "-" + parameter.ParameterName;
                 return parameter.Argument == null ? option : $"{option}:{TranslateExpression(parameter.Argument)}";
             }
+            else if (type == typeof (ExpandableStringExpressionAst))
+            {
+                var str = (ExpandableStringExpressionAst)expression;
+                return TranslateString(str.Value, str.StringConstantType);
+            }
             else if (type == typeof (InvokeMemberExpressionAst))
             {
                 var invokeExpression = (InvokeMemberExpressionAst)expression;
@@ -130,10 +126,21 @@ namespace PowershellAstWriter
                     TranslateExpression(invokeExpression.Member) +
                     $"({argumentList})";
             }
+            else if (type == typeof (MemberExpressionAst))
+            {
+                var member = (MemberExpressionAst)expression;
+                var separator = member.Static ? "::" : ".";
+                return TranslateExpression(member.Expression) + separator + TranslateExpression(member.Member);
+            }
             else if (type == typeof (ScriptBlockExpressionAst))
             {
                 var script = (ScriptBlockExpressionAst)expression;
                 return $"{{ {TranslateScript(script.ScriptBlock)} }}";
+            }
+            else if (type == typeof(UnaryExpressionAst))
+            {
+                var unary = (UnaryExpressionAst)expression;
+                return TranslateToken(unary.TokenKind) + ' ' + TranslateExpression(unary.Child);
             }
             else if (type == typeof(VariableExpressionAst))
             {
@@ -143,6 +150,21 @@ namespace PowershellAstWriter
             else
             {
                 throw new Exception("unhandled");
+            }
+        }
+
+        private string TranslateString(string value, StringConstantType stringType)
+        {
+            switch (stringType)
+            {
+                case StringConstantType.BareWord:
+                    return value;
+                case StringConstantType.DoubleQuoted:
+                    return '"' + value + '"';
+                case StringConstantType.SingleQuoted:
+                    return '\'' + value + '\'';
+                default:
+                    throw new Exception("unhandled");
             }
         }
     }
