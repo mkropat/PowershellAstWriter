@@ -24,7 +24,7 @@ namespace PowershellAstWriter
                 {
                     prefix = TranslateToken(cmdCmd.InvocationOperator) + " ";
                 }
-                return prefix + TranslateExpression(cmdCmd.CommandElements.First());
+                return prefix + string.Join(" ", cmdCmd.CommandElements.Select(TranslateExpression));
             }
             else if (cmdExpression != null)
             {
@@ -69,6 +69,12 @@ namespace PowershellAstWriter
             {
                 var constant = (ConstantExpressionAst)expression;
                 return constant.Value.ToString();
+            }
+            else if (type == typeof (CommandParameterAst))
+            {
+                var parameter = (CommandParameterAst)expression;
+                var option = "-" + parameter.ParameterName;
+                return parameter.Argument == null ? option : $"{option}:{TranslateExpression(parameter.Argument)}";
             }
             else if (type == typeof(VariableExpressionAst))
             {
