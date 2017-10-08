@@ -5,30 +5,30 @@ namespace PowershellAstWriterTests
 {
     public class RoundTripTests
     {
-        [TestCase("", "")]
-        [TestCase("42", "42")]
-        [TestCase("\"derp\"", "\"derp\"")]
-        [TestCase("'derp'", "'derp'")]
-        public void ItRoundTripsConstants(string code, string expected)
+        [TestCase("")]
+        [TestCase("42")]
+        [TestCase("\"derp\"")]
+        [TestCase("'derp'")]
+        public void ItRoundTripsConstants(string code)
         {
-            RoundTrip(code, expected);
+            RoundTrip(code, code);
         }
 
-        [TestCase("$derp", "$derp")]
-        public void ItRoundTripsVariables(string code, string expected)
+        [TestCase("$derp")]
+        public void ItRoundTripsVariables(string code)
         {
-            RoundTrip(code, expected);
+            RoundTrip(code, code);
         }
 
-        [TestCase("Invoke-SomeCmdlet", "Invoke-SomeCmdlet")]
-        [TestCase("& Invoke-SomeCmdlet", "& Invoke-SomeCmdlet")]
-        [TestCase("Invoke-SomeCmdlet herp derp flerp", "Invoke-SomeCmdlet herp derp flerp")]
-        [TestCase("Invoke-SomeCmdlet -Herp -Derp -Flerp", "Invoke-SomeCmdlet -Herp -Derp -Flerp")]
-        [TestCase("Invoke-SomeCmdlet -Herp 123 -Derp 456 -Flerp 789", "Invoke-SomeCmdlet -Herp 123 -Derp 456 -Flerp 789")]
-        [TestCase("Invoke-SomeCmdlet -Herp:$derp", "Invoke-SomeCmdlet -Herp:$derp")]
-        public void ItRoundTripsInvocations(string code, string expected)
+        [TestCase("Invoke-SomeCmdlet")]
+        [TestCase("& Invoke-SomeCmdlet")]
+        [TestCase("Invoke-SomeCmdlet herp derp flerp")]
+        [TestCase("Invoke-SomeCmdlet -Herp -Derp -Flerp")]
+        [TestCase("Invoke-SomeCmdlet -Herp 123 -Derp 456 -Flerp 789")]
+        [TestCase("Invoke-SomeCmdlet -Herp:$derp")]
+        public void ItRoundTripsInvocations(string code)
         {
-            RoundTrip(code, expected);
+            RoundTrip(code, code);
         }
 
         void RoundTrip(string code, string expected)
