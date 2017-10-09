@@ -19,7 +19,7 @@ namespace PowershellAstWriter
             if (!script.EndBlock.Statements.Any())
                 return string.Empty;
 
-            return TranslateStatement(script.EndBlock.Statements.First());
+            return string.Join("\r\n", script.EndBlock.Statements.Select(TranslateStatement));
         }
 
         static string TranslateStatement(StatementAst statement)
@@ -31,6 +31,10 @@ namespace PowershellAstWriter
 
                 case CommandBaseAst s:
                     return TranslateCommand(s);
+
+                case IfStatementAst s:
+                    var clause = s.Clauses.First();
+                    return $@"if ({clause.Item1}) {clause.Item2}";
 
                 case PipelineAst s:
                     return string.Join(" | ", s.PipelineElements.Select(TranslateCommand));

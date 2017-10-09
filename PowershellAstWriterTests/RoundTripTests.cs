@@ -148,6 +148,24 @@ namespace PowershellAstWriterTests
             RoundTrip(code, code);
         }
 
+        [Test]
+        public void ItRoundTripsMultipleStatements()
+        {
+            var code = @"123
+456";
+            RoundTrip(code, code);
+        }
+
+        [Test]
+        public void ItRoundTripsIfStatements()
+        {
+            var code = @"if ($Derp) {
+    Invoke-SomeCommand
+    Invoke-AnotherCommand
+}";
+            RoundTrip(code, code);
+        }
+
         void RoundTrip(string code, string expected)
         {
             var ast = Parser.ParseInput(code, out Token[] tokens, out ParseError[] errors);
