@@ -143,6 +143,7 @@ namespace PowershellAstWriterTests
         }
 
         [TestCase("{ 42 }")]
+        [TestCase("{ 'herp'; 'derp'; 'flerp' }")]
         public void ItRoundTripsScriptBlocks(string code)
         {
             RoundTrip(code, code);
@@ -166,11 +167,53 @@ namespace PowershellAstWriterTests
             RoundTrip(code, code);
         }
 
+        [Test]
+        public void ItRoundTripsIfChains()
+        {
+            var code = @"if ($Herp) {
+    Invoke-SomeCommand
+}
+elseif ($Derp) {
+    Invoke-AnotherCommand
+}
+elseif ($Flerp) {
+    Invoke-AThirdCommand
+}";
+            RoundTrip(code, code);
+        }
+
+        [Test]
+        public void ItRoundTripsIfElseStatements()
+        {
+            var code = @"if ($Derp) {
+    Invoke-SomeCommand
+}
+else {
+    Invoke-AnotherCommand
+}";
+            RoundTrip(code, code);
+        }
+
+        [Test]
+        public void ItRoundTripsNestedIndents()
+        {
+            var code = @"if ($Herp) {
+    if ($Derp) {
+        if ($Flerp) {
+            Invoke-SomeCommand
+            Invoke-AnotherCommand
+        }
+    }
+}";
+            RoundTrip(code, code);
+        }
+
         void RoundTrip(string code, string expected)
         {
             var ast = Parser.ParseInput(code, out Token[] tokens, out ParseError[] errors);
             var subject = new PowershellAstWriter.PowershellAstWriter();
-            Assert.AreEqual(expected, subject.Write(ast));
+            var actual = subject.Write(ast);
+            Assert.AreEqual(expected, actual);
         }
     }
 }

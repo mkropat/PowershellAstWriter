@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Management.Automation.Language;
 
@@ -6,39 +7,76 @@ namespace PowershellAstWriter
 {
     public class PowershellAstWriter
     {
-        public string Write(ScriptBlockAst ast)
+        public string Write(ScriptBlockAst ast, string indent="    ")
         {
             if (ast == null)
                 throw new ArgumentNullException(nameof(ast));
 
-            return TranslateScript(ast);
+            return string.Join("\r\n", TranslateScript(ast).Select(x => x.Render(indent)));
         }
 
-        static string TranslateScript(ScriptBlockAst script)
+        static IEnumerable<Line> TranslateScript(ScriptBlockAst script)
         {
             if (!script.EndBlock.Statements.Any())
-                return string.Empty;
+                return Enumerable.Empty<Line>();
 
-            return string.Join("\r\n", script.EndBlock.Statements.Select(TranslateStatement));
+            return script.EndBlock.Statements.SelectMany(x => TranslateStatement(x));
         }
 
-        static string TranslateStatement(StatementAst statement)
+        static IEnumerable<Line> TranslateStatementBlock(StatementBlockAst block)
+        {
+            var statements = block.Statements.SelectMany(x => TranslateStatement(x));
+            return new[] { new Line("{") }
+                .Concat(statements.Select(line => line.Indent()))
+                .Concat(new [] { new Line("}") });
+        }
+
+        static IEnumerable<Line> TranslateStatement(StatementAst statement)
         {
             switch (statement)
             {
                 case AssignmentStatementAst s:
-                    return $"{TranslateExpression(s.Left)} {TranslateToken(s.Operator)} {TranslateStatement(s.Right)}";
+                    foreach (var line in new Line($"{TranslateExpression(s.Left)} {TranslateToken(s.Operator)} ").Join(TranslateStatement(s.Right)))
+                        yield return line;
+                    yield break;
 
                 case CommandBaseAst s:
-                    return TranslateCommand(s);
+                    yield return new Line(TranslateCommand(s));
+                    yield break;
 
                 case IfStatementAst s:
-                    var clause = s.Clauses.First();
-                    return $@"if ({clause.Item1}) {clause.Item2}";
+                    var first = s.Clauses.First();
+                    foreach (var line in new Line($"if ({TranslatePipeline(first.Item1)}) ").Join(TranslateStatementBlock(first.Item2)))
+                        yield return line;
+
+                    var subsequent = s.Clauses.Skip(1);
+                    var subsequentLines = subsequent.SelectMany(x => new Line($"elseif ({TranslatePipeline(x.Item1)}) ").Join(TranslateStatementBlock(x.Item2)));
+                    foreach (var line in subsequentLines)
+                        yield return line;
+
+                    if (s.ElseClause != null)
+                    {
+                        foreach (var line in new Line("else ").Join(TranslateStatementBlock(s.ElseClause)))
+                            yield return line;
+                    }
+
+                    yield break;
 
                 case PipelineAst s:
-                    return string.Join(" | ", s.PipelineElements.Select(TranslateCommand));
+                    yield return new Line(TranslatePipeline(s));
+                    yield break;
 
+                default:
+                    throw new Exception("unhandled");
+            }
+        }
+
+        static string TranslatePipeline(PipelineBaseAst pipeline)
+        {
+            switch (pipeline)
+            {
+                case PipelineAst p:
+                    return string.Join(" | ", p.PipelineElements.Select(TranslateCommand));
                 default:
                     throw new Exception("unhandled");
             }
@@ -119,7 +157,7 @@ namespace PowershellAstWriter
                     return TranslateExpression(e.Expression) + separator + TranslateExpression(e.Member);
 
                 case ScriptBlockExpressionAst e:
-                    return $"{{ {TranslateScript(e.ScriptBlock)} }}";
+                    return $"{{ {string.Join("; ", TranslateScript(e.ScriptBlock).Select(x => x.Text))} }}";
 
                 case UnaryExpressionAst e:
                     return TranslateToken(e.TokenKind) + ' ' + TranslateExpression(e.Child);
