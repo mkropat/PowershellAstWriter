@@ -1,11 +1,14 @@
 ﻿using NUnit.Framework;
 using System;
+using System.Linq;
 using System.Management.Automation.Language;
 
 namespace PowershellAstWriterTests
 {
-    public class RoundTripTests
+    public class PowershellAstWriterTests
     {
+        IScriptExtent StubExtent = new ScriptExtent(new ScriptPosition("stub", 0, 0, string.Empty), new ScriptPosition("stub", 0, 0, string.Empty));
+
         [Test]
         public void ItThrowsArgumentNullExceptionWhenPassedNull()
         {
@@ -22,16 +25,40 @@ namespace PowershellAstWriterTests
             RoundTrip(code, code);
         }
 
+        [Test]
+        public void ItRendersConstantExpressionAsts()
+        {
+            var constant = new ConstantExpressionAst(StubExtent, 42);
+
+            Assert.AreEqual("42", WriteExpression(constant));
+        }
+
         [TestCase("$derp")]
         public void ItRoundTripsVariables(string code)
         {
             RoundTrip(code, code);
         }
 
+        [Test]
+        public void ItRendersVariableExpressionAst()
+        {
+            var variable = new VariableExpressionAst(StubExtent, "derp", splatted: false);
+
+            Assert.AreEqual("$derp", WriteExpression(variable));
+        }
+
         [TestCase("\"herp $($derp) flerp\"")]
         public void ItRoundTripsExpandableStrings(string code)
         {
             RoundTrip(code, code);
+        }
+
+        [Test]
+        public void ItRendersExpandableStringExpressionAst()
+        {
+            var expandableExpression = new ExpandableStringExpressionAst(StubExtent, "herp $($derp) flerp", StringConstantType.DoubleQuoted);
+
+            Assert.AreEqual("\"herp $($derp) flerp\"", WriteExpression(expandableExpression));
         }
 
         [TestCase("Invoke-SomeCmdlet")]
@@ -113,6 +140,25 @@ namespace PowershellAstWriterTests
             RoundTrip(code, expected ?? code);
         }
 
+        [Test]
+        public void ItRendersUnaryExpressionAst()
+        {
+            var variable = new VariableExpressionAst(StubExtent, "derp", splatted: false);
+            var unary = new UnaryExpressionAst(StubExtent, TokenKind.Not, variable);
+
+            Assert.AreEqual("-not $derp", WriteExpression(unary));
+        }
+
+        [Test]
+        public void ItRendersBinaryExpressionAst()
+        {
+            var leftVariable = new VariableExpressionAst(StubExtent, "herp", splatted: false);
+            var rightVariable = new VariableExpressionAst(StubExtent, "derp", splatted: false);
+            var binary = new BinaryExpressionAst(StubExtent, leftVariable, TokenKind.Ieq, rightVariable, StubExtent);
+
+            Assert.AreEqual("$herp -eq $derp", WriteExpression(binary));
+        }
+
         [TestCase("$derp.Frobnicate()")]
         [TestCase("$derp.Frobnicate(123, 456, 789)")]
         [TestCase("$derp::Frobnicate(123, 456, 789)")]
@@ -121,11 +167,31 @@ namespace PowershellAstWriterTests
             RoundTrip(code, code);
         }
 
+        [Test]
+        public void ItRendersInvokeMemberExpressionAst()
+        {
+            var obj = new VariableExpressionAst(StubExtent, "derp", splatted: false);
+            var member = new StringConstantExpressionAst(StubExtent, "Frobnicate", StringConstantType.BareWord);
+            var invokeMember = new InvokeMemberExpressionAst(StubExtent, obj, member, Enumerable.Empty<ExpressionAst>(), @static: false);
+
+            Assert.AreEqual("$derp.Frobnicate()", WriteExpression(invokeMember));
+        }
+
         [TestCase("$herp.Derp")]
         [TestCase("$herp::Derp")]
         public void ItRoundTripsMemberAccess(string code)
         {
             RoundTrip(code, code);
+        }
+
+        [Test]
+        public void ItRendersMemberExpressionAst()
+        {
+            var obj = new VariableExpressionAst(StubExtent, "herp", splatted: false);
+            var member = new StringConstantExpressionAst(StubExtent, "Derp", StringConstantType.BareWord);
+            var memberExpression = new MemberExpressionAst(StubExtent, obj, member, @static: false);
+
+            Assert.AreEqual("$herp.Derp", WriteExpression(memberExpression));
         }
 
         [TestCase("Invoke-SomeCmdlet | Invoke-AnotherCmdlet | Invoke-AThirdCmdlet")]
@@ -140,6 +206,16 @@ namespace PowershellAstWriterTests
         public void ItRoundTripsAssignments(string code)
         {
             RoundTrip(code, code);
+        }
+
+        [Test]
+        public void ItRendersAssignmentStatementAst()
+        {
+            var left = new VariableExpressionAst(StubExtent, "derp", splatted: false);
+            var right = new CommandExpressionAst(StubExtent, new ConstantExpressionAst(StubExtent, 42), Enumerable.Empty<RedirectionAst>());
+            var assignment = new AssignmentStatementAst(StubExtent, left, TokenKind.Equals, right, StubExtent);
+
+            Assert.AreEqual("$derp = 42", WriteStatement(assignment));
         }
 
         [TestCase("{ 42 }")]
@@ -165,6 +241,22 @@ namespace PowershellAstWriterTests
     Invoke-AnotherCommand
 }";
             RoundTrip(code, code);
+        }
+
+        [Test]
+        public void ItRendersIfStatementAst()
+        {
+
+            var derpVar = new VariableExpressionAst(StubExtent, "Derp", splatted: false);
+            var condition = new PipelineAst(StubExtent, new CommandAst(StubExtent, new[] { derpVar }, TokenKind.Unknown, Enumerable.Empty<RedirectionAst>()));
+            var command = new CommandExpressionAst(StubExtent, new StringConstantExpressionAst(StubExtent, "Invoke-SomeCommand", StringConstantType.BareWord), Enumerable.Empty<RedirectionAst>());
+            var statement = new StatementBlockAst(StubExtent, new[] { command }, Enumerable.Empty<TrapStatementAst>());
+            var ifStatement = new IfStatementAst(StubExtent, new [] { Tuple.Create<PipelineBaseAst, StatementBlockAst>(condition, statement) }, elseClause: null);
+
+            var expected = @"if ($Derp) {
+    Invoke-SomeCommand
+}";
+            Assert.AreEqual(expected, WriteStatement(ifStatement));
         }
 
         [Test]
@@ -214,6 +306,21 @@ else {
             var subject = new PowershellAstWriter.PowershellAstWriter();
             var actual = subject.Write(ast);
             Assert.AreEqual(expected, actual);
+        }
+
+        string WriteExpression(ExpressionAst expression)
+        {
+            var command = new CommandExpressionAst(StubExtent, expression, null);
+            var statement = new PipelineAst(StubExtent, new CommandBaseAst[] { command });
+            return WriteStatement(statement);
+        }
+
+        string WriteStatement(StatementAst statement)
+        {
+            var ast = new ScriptBlockAst(StubExtent, null, new StatementBlockAst(StubExtent, new[] { statement }, null), false);
+
+            var subject = new PowershellAstWriter.PowershellAstWriter();
+            return subject.Write(ast);
         }
     }
 }
